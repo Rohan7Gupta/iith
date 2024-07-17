@@ -12,8 +12,8 @@ from scipy.interpolate import interp1d
 from scipy.integrate import quad
 #import math
 
-N_A = 5e19
-N_D = 5e19
+N_A = 9e19
+N_D = 1e19
 
 epsilon_0 = 8.854187817e-12  # Permittivity of free space (F/m)
 epsilon_inf = 11.7           # High-frequency permittivity for Si
@@ -421,8 +421,23 @@ Source: Electrooptical  Effects  in  Silicon
 #         epsilon = permittivity(float(V_R), N_A, N_D)
 #         return (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)+ np.real(epsilon))/2)))
 # =============================================================================
-
-
+"""
+Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave Mach-Zehnder Modulator
+        David Patel
+"""
+# =============================================================================
+# def n_effective(voltage, N_A, N_D,theory):  #Theory = 1, synopsis = 0, lorentz = 2
+#     V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
+#     if theory == 1:
+#         return -(5.4e-22 * pow(carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6),1.011) + 1.53e-18 * pow(carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6),0.838))
+#     elif theory == 0:
+#         #print(V_R,type(V_R))
+#         return -(5.4e-22 * pow(carrier_n(V_R,N_A,N_D),1.011) + 1.53e-18 * pow(carrier_p(V_R,N_A,N_D),0.838))
+#     elif theory == 2:
+#         epsilon = permittivity(float(V_R), N_A, N_D)
+#         return (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)+ np.real(epsilon))/2)))
+# 
+# =============================================================================
 
 
 def del_phi_eff(V_R, N_A, N_D, LENGTH,theory): #Theory = 1, synopsis = 0, lorentz = 2
@@ -475,6 +490,27 @@ Source: Electrooptical  Effects  in  Silicon
 #         del_alpha = ( 2*k_0*k_eff )/1e2 #/cm
 #         alpha_db = 10*(del_alpha)*np.log10(np.e)
 #         print(del_alpha, alpha_db)
+#         return alpha_db * (LENGTH/10)
+# =============================================================================
+"""
+Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave Mach-Zehnder Modulator
+        David Patel
+"""
+# def alpha_eff(voltage,N_A,N_D,theory): #Theory = 1, synopsis = 0, lorentz = 2
+#     V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
+#     if theory == 1:
+#         del_alpha =  (8.88e-21 * pow(carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6),1.167) + 5.84e-20 * pow(carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6),1.109)) #/cm
+#         alpha_db = 10 * (del_alpha) * np.log(np.e) #db/cm
+#         return alpha_db * (LENGTH / 10)
+#     elif theory == 0:    
+#         del_alpha =  (8.88e-21 * pow(carrier_n(V_R,N_A,N_D),1.167) + 5.84e-20 * pow(carrier_p(V_R,N_A,N_D),1.109))
+#         alpha_db = 10 * (del_alpha) * np.log(np.e) #db/cm
+#         return alpha_db * (LENGTH / 10)
+#     elif theory == 2:
+#         epsilon = permittivity(float(V_R), N_A, N_D)
+#         k_eff = (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)- np.real(epsilon))/2)))
+#         del_alpha = ( 2*k_0*k_eff )/1e2 #/cm
+#         alpha_db = 10*(del_alpha)*np.log10(np.e)
 #         return alpha_db * (LENGTH/10)
 # =============================================================================
 
@@ -553,7 +589,7 @@ def plot_alpha_eff(N_A, N_D):
 
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.ylabel(r' $\Delta \alpha_{eff}$ [dB] ', fontdict={'family': 'Times New Roman', 'size': 12})
-    plt.title(rf'$\Delta \alpha_{{eff}}$ vs. Reverse Bias Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
+    plt.title(rf'$\Delta \alpha_{{eff}}$ vs. Reverse Bias Voltage $N_A = {N_A}$ $N_D = {N_D}$ at Length {LENGTH}m', fontdict={'family': 'Times New Roman', 'size': 14})
     plt.grid(True)
     plt.legend()
     plt.show()
@@ -561,12 +597,12 @@ def plot_alpha_eff(N_A, N_D):
 
 
 def calculate_junction_capacitance(N_A,N_D):
-    voltages_range =  np.arange(-0.5,-5.1,-0.5)
+    voltages_range =  np.arange(0,-5.1,-0.5)
     cv = []
     
     voltages = [f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))  for voltage in voltages_range]
     total_charges = [e*(carrier_p(V,N_A,N_D) + carrier_n(V,N_A,N_D)) for V in voltages] #couloumb/cc
-    capacitances = np.gradient(total_charges,voltages_range) #F/cc
+    capacitances = np.gradient(total_charges,voltages_range)#F/cc
     #plt.plot(abs(voltages_range),total_charges, marker='o')
     #print (total_charges,voltages_range,capacitances)
     cv.append(voltages_range)
@@ -577,23 +613,33 @@ def capacitances_theory(V,N_A,N_D) :
     V_bi = calculate_builtin_voltage(N_A, N_D)
     return np.sqrt((e*epsilon_s*1e-2*N_A*N_D)/(2*(N_A+N_D)*(V_bi - V)))
 
-def capacitances_extract(V):
-    return (1.718e-9 * V ** 8 - 3.719e-8 * V ** 7 + 3.29e-7 * V ** 6 - 1.531e-6 * V ** 5 +
-            4.022e-6 * V ** 4 - 6.027e-6 * V ** 3 + 5.255e-6 * V ** 2 - 5.255e-6 * V + 2.65e-6)
+def capacitances_extract(N_A,N_D):
+    """
+    return (1.718e-9 * pow(V, 8) - 3.719e-8 * pow(V, 7) + 3.29e-7 * pow(V, 6) - 1.531e-6 * pow(V, 5) +
+            4.022e-6 * pow(V, 4) - 6.027e-6 * pow(V, 3) + 5.255e-6 * pow(V, 2) - 5.255e-6 * V + 2.65e-6)
+    """
+    if(N_A == 5e19 and N_D == 5e19):
+        file_path = r"C:\Users\lenovo\Documents\spyder\CV 5e19.xlsx" 
+    if(N_A == 9e19 and N_D == 1e19):
+        file_path = r"C:\Users\lenovo\Documents\spyder\CV p+n.xlsx"
+    df = pd.read_excel(file_path)
+    voltage = df['Voltage']
+    capacitance = df['Capacitance']
+    return voltage,capacitance
     
 def plot_cap(N_A,N_D):  
     cv = calculate_junction_capacitance(N_A,N_D) #dq/dv
     capacitance = [capacitances_theory(V,N_A,N_D)for V in cv[0]] #formula
-    #capacitance_extract = [capacitances_extract(abs(V))for V in cv[0]] #formula
+    voltage,capacitance_extract = capacitances_extract(N_A,N_D)
     plt.figure(figsize=(10, 6))
     plt.plot(abs(cv[0]),cv[1], marker='o', color = 'red', label = 'capacitance experimental')
     plt.plot(abs(cv[0]),capacitance, color = 'blue', label = 'capacitance theory')
-    #plt.plot(abs(cv[0]),capacitance_extract, color = 'green', label = 'capacitance extract')
+    plt.plot(voltage,capacitance_extract, color = 'green', label = 'capacitance extract')
 
     #plt.yscale('log')
-    plt.xlabel('Voltage (V)')
-    plt.ylabel('Capacitance (F/cm\u00b2)')
-    plt.title(f'Junction Capacitance vs. Voltage $N_A = {N_A}$ $N_D = {N_D}$')
+    plt.xlabel('Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.ylabel('Capacitance (F/cm\u00b2)', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.title(f'Junction Capacitance vs. Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
     plt.grid(True)
     plt.legend()
     plt.show()
@@ -631,7 +677,29 @@ def Vpi_calc(N_A,N_D,theory):
 
     return Vpi
 
-
+def Lpi(N_A,N_D,theory):
+    if theory != 0:
+        V_R = np.arange(-0.1,-10,-0.001)
+    else:
+        V_R = np.arange(-0.5,-5.1,-0.5)
+    lut = []
+    for v in V_R:
+        row = [v]
+        del_n_eff = abs(n_effective(v, N_A, N_D,theory)- n_effective(0, N_A, N_D,theory)) #/cc
+        Lpi = (wavelength*100)/(2*del_n_eff )
+        row.append(Lpi*10)
+        lut.append(row)
+    v,Lpi = zip(*lut)
+    plt.figure(figsize=(10, 6))
+    plt.yscale('log')
+    plt.plot(v,Lpi, color = 'red', label = 'Lpi')
+    plt.xlabel('Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.ylabel('Lpi (mm)', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.title(f'Lpi vs. Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+    
 
 
 h_data_by_voltage1 = {}
@@ -644,6 +712,7 @@ print('theory', Vpi_calc(N_A, N_D,1))
 print('exp', Vpi_calc(N_A, N_D,0))
 print('lorentz', Vpi_calc(N_A,N_D,2))
 
+Lpi(N_A,N_D,1)
 plot_cap(N_A,N_D)
 plot_phi_eff(N_A, N_D)
 plot_n_eff(N_A, N_D)
