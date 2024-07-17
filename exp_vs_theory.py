@@ -12,8 +12,8 @@ from scipy.interpolate import interp1d
 from scipy.integrate import quad
 #import math
 
-N_A = 9e19
-N_D = 1e19
+N_A = 5e19
+N_D = 5e19
 
 epsilon_0 = 8.854187817e-12  # Permittivity of free space (F/m)
 epsilon_inf = 11.7           # High-frequency permittivity for Si
@@ -441,7 +441,7 @@ Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave M
 
 
 def del_phi_eff(V_R, N_A, N_D, LENGTH,theory): #Theory = 1, synopsis = 0, lorentz = 2
-    return ((k_0 *abs( n_effective(V_R, N_A, N_D,theory) - n_effective(0, N_A, N_D,theory))*1e6 * LENGTH *1e-3 )*(180/np.pi)) % 360 #degree phase
+    return ((k_0 *abs( n_effective(V_R, N_A, N_D,theory) - n_effective(0, N_A, N_D,theory)) * LENGTH/4 )) % (2*np.pi) #degree phase
 
 """
 Source: Silicon optical modulators  
@@ -514,7 +514,7 @@ Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave M
 #         return alpha_db * (LENGTH/10)
 # =============================================================================
 
-def plot_phi_eff(N_A1, N_D1):
+def plot_phi_eff(N_A, N_D):
     V_R_range1 =  np.arange(0,-5.1,-0.5) #    V_R_range =  np.arange(0,-10.1,-0.5)
 
     
@@ -536,13 +536,20 @@ def plot_phi_eff(N_A1, N_D1):
     plt.ylabel(r' $\Delta \phi_{eff}$ [deg/mm]', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.title(rf'$\Delta \phi_{{eff}}$ vs. Reverse Bias Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
     plt.grid(True)
+    
+    y_ticks = np.arange(0, 2.1 * np.pi, 0.5 * np.pi)
+    y_tick_labels = [f'{tick/np.pi:.1f}π' for tick in y_ticks]
+
+    plt.gca().set_yticks(y_ticks)
+    plt.gca().set_yticklabels(y_tick_labels)
+    
     plt.legend()
     plt.show()
 
 def plot_n_eff(N_A, N_D):
     V_R_range1 =  np.arange(0,-5.1,-0.5)  #  V_R_range =  np.arange(0,-10.1,-0.5)
     V_R_range =  np.arange(0,-5.1,-0.005) #    V_R_range =  np.arange(0,-10.1,-0.5)
-
+    
 
     delta_n_eff_values1 = [((n_effective(V_R, N_A, N_D,0) - n_effective(0, N_A, N_D,0))) for V_R in V_R_range1]
 
@@ -556,13 +563,11 @@ def plot_n_eff(N_A, N_D):
 #     delta_n_eff_values2 = [((n_effective(V_R, N_A, N_D,1) )) for V_R in V_R_range]
 # =============================================================================
 
-
     plt.figure(figsize=(10, 6))
     plt.plot(V_R_range1, delta_n_eff_values1, label='Effective Refractive Index synoposis', color = 'blue')
     plt.plot(V_R_range, (delta_n_eff_values2), label='Effective Refractive Index literature', color = 'red')
     plt.plot(V_R_range, (delta_n_eff_values3), label='Effective Refractive Index lorentz', color = 'green')
 
-    
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.ylabel(r' $\Delta n_{eff}$ ', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.title(rf'$\Delta n_{{eff}}$ vs. Reverse Bias Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
@@ -661,7 +666,7 @@ def Vpi_lut(N_A,N_D,theory):
     for v in V_R:
         row = [v]
         del_n_eff = abs(n_effective(v, N_A, N_D,theory)- n_effective(0, N_A, N_D,theory)) #/cc
-        del_phi = (k_0 * del_n_eff*1e6 *LENGTH*1e-3  )% (2*np.pi)
+        del_phi = ((k_0 *del_n_eff * LENGTH/4 )) % (2*np.pi)
         row.append(del_phi)
         lut.append(row)
         #print(wavelength)
@@ -691,7 +696,7 @@ def Lpi(N_A,N_D,theory):
         lut.append(row)
     v,Lpi = zip(*lut)
     plt.figure(figsize=(10, 6))
-    plt.yscale('log')
+    plt.yscale('linear')
     plt.plot(v,Lpi, color = 'red', label = 'Lpi')
     plt.xlabel('Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.ylabel('Lpi (mm)', fontdict={'family': 'Times New Roman', 'size': 12})
@@ -713,6 +718,8 @@ print('exp', Vpi_calc(N_A, N_D,0))
 print('lorentz', Vpi_calc(N_A,N_D,2))
 
 Lpi(N_A,N_D,1)
+Lpi(N_A,N_D,0)
+
 plot_cap(N_A,N_D)
 plot_phi_eff(N_A, N_D)
 plot_n_eff(N_A, N_D)
