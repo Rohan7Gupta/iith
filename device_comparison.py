@@ -419,7 +419,7 @@ def plot_phi_eff(N_A1, N_D1,N_A2,N_D2,N_A3,N_D3,theory):
     plt.plot(V_R_range, (delta_phi3), label=rf'Effective del phi $N_A = {N_A3}$ $N_D = {N_D3}$', color = 'green', linestyle = 'dashed')
 
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
-    plt.ylabel(r' $\Delta \phi_{eff}$ [deg/mm]', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.ylabel(r' $\Delta \phi_{eff}$ [deg/m]', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.title(f'$\Delta \phi_{{eff}}$ vs. Reverse Bias Voltage type = {type[theory]}', fontdict={'family': 'Times New Roman', 'size': 14})
     plt.grid(True)
     
@@ -477,9 +477,9 @@ def plot_alpha_eff(N_A1, N_D1,N_A2,N_D2,N_A3,N_D3,theory):
     delta_alpha3 = [(alpha_eff(V_R, N_A3, N_D3,theory)) for V_R in V_R_range]
     
     plt.figure(figsize=(10, 6))
-    plt.plot(V_R_range, (delta_alpha1), label='Effective Loss index $N_A = {N_A1}$ $N_D = {N_D1}$', color = 'blue', linestyle = 'solid',linewidth = 4)
-    plt.plot(V_R_range, (delta_alpha2), label='Effective loss index $N_A = {N_A2}$ $N_D = {N_D2}$', color = 'red', linestyle = 'dotted',linewidth = 2)
-    plt.plot(V_R_range, (delta_alpha3), label='Effective loss index $N_A = {N_A3}$ $N_D = {N_D3}$', color = 'green', linestyle = 'dotted',linewidth = 2)
+    plt.plot(V_R_range, (delta_alpha1), label=rf'Effective Loss index $N_A = {N_A1}$ $N_D = {N_D1}$', color = 'blue', linestyle = 'solid',linewidth = 4)
+    plt.plot(V_R_range, (delta_alpha2), label=rf'Effective loss index $N_A = {N_A2}$ $N_D = {N_D2}$', color = 'red', linestyle = 'dotted',linewidth = 2)
+    plt.plot(V_R_range, (delta_alpha3), label=rf'Effective loss index $N_A = {N_A3}$ $N_D = {N_D3}$', color = 'green', linestyle = 'dotted',linewidth = 2)
 
 
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
@@ -510,6 +510,37 @@ def Vpi_calc(N_A,N_D,theory):
     Vpi= interp_func(np.pi)
 
     return Vpi
+
+def Lpi(N_A1,N_D1,N_A2,N_D2,N_A3,N_D3,theory):
+    if theory != 0:
+        V_R = np.arange(-0.1,-10,-0.001)
+    else:
+        V_R = np.arange(-0.5,-5.1,-0.5)
+    lut = []
+    for v in V_R:
+        row = [v]
+        del_n_eff1 = abs(n_effective(v, N_A1, N_D1,theory)- n_effective(0, N_A1, N_D1,theory)) #/cc
+        del_n_eff2 = abs(n_effective(v, N_A2, N_D2,theory)- n_effective(0, N_A2, N_D2,theory)) #/cc
+        del_n_eff3 = abs(n_effective(v, N_A3, N_D3,theory)- n_effective(0, N_A3, N_D3,theory)) #/cc
+        Lpi1 = (wavelength*100)/(2*del_n_eff1 )
+        Lpi2 = (wavelength*100)/(2*del_n_eff2 )
+        Lpi3 = (wavelength*100)/(2*del_n_eff3 )
+        row.append(Lpi1*10)
+        row.append(Lpi2*10)
+        row.append(Lpi3*10)
+        lut.append(row)
+    v,Lpi1,Lpi2,Lpi3 = zip(*lut)
+    plt.figure(figsize=(10, 6))
+    plt.yscale('linear')
+    plt.plot(v,Lpi1, color = 'red', label = rf'Lpi $N_A = {N_A1}$ $N_D = {N_D1}$')
+    plt.plot(v,Lpi2, color = 'blue', label = rf'Lpi $N_A = {N_A2}$ $N_D = {N_D2}$')
+    plt.plot(v,Lpi3, color = 'green', label = rf'Lpi $N_A = {N_A3}$ $N_D = {N_D3}$')
+    plt.xlabel('Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.ylabel('Lpi (mm)', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.title(f'Lpi vs. Voltage type = {type[theory]}', fontdict={'family': 'Times New Roman', 'size': 14})
+    plt.grid(True)
+    plt.legend()
+    plt.show()
 '''
 N_A1 = float(input("Enter the Acceptor concentration (N_A1) in m^-3: "))
 N_D1 = float(input("Enter the Donor concentration (N_D1) in m^-3: "))
@@ -557,7 +588,9 @@ h_data_by_voltage2 = {}
 e_data_by_voltage2 = {}
 h_data_by_voltage2,e_data_by_voltage2 =   read_data(N_A2, N_D2)
 '''
-
+Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 0)
+Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 1)
+Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 2)
 plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
 plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,1)
 plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,2)
