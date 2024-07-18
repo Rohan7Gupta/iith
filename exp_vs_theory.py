@@ -441,7 +441,7 @@ Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave M
 
 
 def del_phi_eff(V_R, N_A, N_D, LENGTH,theory): #Theory = 1, synopsis = 0, lorentz = 2
-    return ((k_0 *abs( n_effective(V_R, N_A, N_D,theory) - n_effective(0, N_A, N_D,theory)) * LENGTH/4 )) % (2*np.pi) #degree phase
+    return ((k_0 *abs( n_effective(V_R, N_A, N_D,theory) - n_effective(0, N_A, N_D, theory))*1e6* LENGTH *0.25 * 1e-3 )) % (2*np.pi) #degree phase
 
 """
 Source: Silicon optical modulators  
