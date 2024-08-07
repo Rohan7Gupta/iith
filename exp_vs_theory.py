@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jul 11 07:55:23 2024
-
+Created on Mon Jul 29 19:21:22 2024
 @author: Rohan Gupta
 """
 import pandas as pd
@@ -10,10 +9,10 @@ import numpy as np
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
-#import math
+import math
+from scipy.optimize import curve_fit
 
-N_A = 5e19
-N_D = 5e19
+
 
 epsilon_0 = 8.854187817e-12  # Permittivity of free space (F/m)
 epsilon_inf = 11.7           # High-frequency permittivity for Si
@@ -42,7 +41,7 @@ omega = 2 * np.pi * c / wavelength  # Angular frequency of light (rad/s)
 gamma = 1e15                 # Collision frequency (1/s)
 epsilon_s = epsilon_inf * epsilon_0  # Permittivity of silicon
 k = 1.38064852e-23           # boltzmann constant [J/K]
-t = 298                      #kelvin
+t = 300                     #kelvin
 k_0 = 2*np.pi / wavelength
 LENGTH = 4e-3                # Lenght of phase shifter (m)
 length = 0.5e-6
@@ -59,73 +58,67 @@ n = 3.7 #what is refractive  index of unperturbed  c-Si
 
 # Function to calculate built-in voltage
 def calculate_builtin_voltage(N_A, N_D):
-    V_bi = (k * t / e) * np.log((N_A * N_D) / n_i**2)
+    V_bi = (k * t / e) * np.log((N_A * N_D) / (n_i*1e6)**2)
     return V_bi
 
 """
 Source : Electron and Hole Mobilities in Silicon as a Function of Concentration and Temperature
          N.D. Arora; J.R. Hauser; D.J. Roulston
 """
-# =============================================================================
-# def calculate_mobilities(Nd, Na, T=300):
-#     # Constants for electron mobility
-#     mu_e_0 = 88
-#     T_ref = 300
-#     B_e = 7.4e8
-#     C_e = 1.26e17
-#     alpha_e = -0.57
-#     beta_e = -2.33
-#     gamma_e = 2.4
-#     delta_e = -0.146
-# 
-#     # Electron mobility calculation
-#     mu_e = (mu_e_0 * (T / T_ref) ** alpha_e +
-#             (B_e * T ** beta_e) /
-#             (1 + 0.88 * ((Nd / (C_e * (T / T_ref) ** gamma_e)) * (T / T_ref) ** delta_e)))
-# 
-#     # Constants for hole mobility
-#     mu_h_0 = 54.3
-#     B_h = 1.36e8
-#     C_h = 2.35e17
-#     alpha_h = -0.57
-#     beta_h = -2.33
-#     gamma_h = 2.4
-#     delta_h = -0.146
-# 
-#     # Hole mobility calculation
-#     mu_h = (mu_h_0 * (T / T_ref) ** alpha_h +
-#             (B_h * T ** beta_h) /
-#             (1 + 0.88 * ((Na / (C_h * (T / T_ref) ** gamma_h)) * (T / T_ref) ** delta_h)))
-# 
-#     return mu_e, mu_h
-# 
-# 
-# u_e, u_h = calculate_mobilities(N_D, N_A, t)
-# =============================================================================
+def calculate_mobilities(N_A, N_D, T=300):
+
+    # Electron mobility parameters for silicon at 300K
+    mu_n0 = 65      # cm^2/V·s
+    mu_n1 = 1414    # cm^2/V·s
+    N_ref_n = 9.68e16  # cm^-3
+    gamma_n = 0.68
+
+    # Calculate electron mobility
+    mu_n = mu_n0 + (mu_n1 - mu_n0) / (1 + (N_D / N_ref_n) ** gamma_n)
+
+
+    # Hole mobility parameters for silicon at 300K
+    mu_p0 = 48      # cm^2/V·s
+    mu_p1 = 470.5   # cm^2/V·s
+    N_ref_p = 2.35e17  # cm^-3
+    gamma_p = 0.76
+
+    # Calculate hole mobility
+    mu_p = mu_p0 + (mu_p1 - mu_p0) / (1 + (N_A / N_ref_p) ** gamma_p)
+    return mu_n, mu_p
+
+
 
 
 
 def depletion_width(V_R, N_A, N_D):
     V_bi = calculate_builtin_voltage(N_A, N_D)
-    return np.sqrt(abs(2 * epsilon_s * (V_bi + V_R) * (N_A + N_D) / (e * (N_A * N_D))))
+    d=(2 * epsilon_s * (V_bi + abs(V_R)) * (N_A + N_D) / (e * N_A * N_D))
+    return np.sqrt(d)
 
-def x_n(V_R, N_A, N_D): # n depletion width
-    return depletion_width(V_R, N_A, N_D) * N_A / (N_A + N_D) #meter
+def x_n(V_R, N_A, N_D):
+    return depletion_width(V_R, N_A, N_D) * N_A / (N_A + N_D)
 
-def x_p(V_R, N_A, N_D): # p depletion width
-    return -depletion_width(V_R, N_A, N_D) * N_D / (N_A + N_D) #meter
+def x_p(V_R, N_A, N_D):
+    return -depletion_width(V_R, N_A, N_D) * N_D / (N_A + N_D)
 
 """
  Source: CARRIER CONCENTRATIONS AND DRIFT CURRENTS IN THE DEPLETION REGION OF A p n JUNCTION
          D. K. MAK
 """
 def p_x_maj(x, V_R, N_A, N_D): #majority p carrier desity -xp<x<0
-    a_p = (e**2)*N_A / (2*epsilon_s*k*t)
-    return N_A * np.exp(-a_p * (-x + x_p(V_R, N_A, N_D))**2) # /m3
+    a_p = (e ** 2) * N_A / (2 * epsilon_s * k * t)
+    x_p_val = -x_p(V_R, N_A, N_D)
+    p = N_A * np.exp(-a_p * (x + x_p_val) ** 2)
+    #print("p\t",a_p,N_A,p)
+    return p 
 
 def n_x_maj(x, V_R, N_A, N_D): #majority n carrier density 0<x<xn
-    a_n = (e**2)*N_D / (2*epsilon_s*k*t)
-    return N_D * np.exp(-a_n * (x - x_n(V_R, N_A, N_D))**2) # /m3
+    a_n = (e ** 2) * N_D / (2 * epsilon_s * k * t)
+    x_n_val = x_n(V_R, N_A, N_D)
+    n = N_D * np.exp(-a_n * (x - x_n_val) ** 2)
+    #print("n\t",a_n,N_D,n)
+    return n 
 
 """
 standard approach (need to det constants experimentally)
@@ -325,6 +318,7 @@ def plasma_frequency_h(V_R, N_A, N_D): #drude model
 # =============================================================================
 def permittivity(V_R, N_A, N_D):
     omega_p = (N_D*plasma_frequency_e(V_R, N_A, N_D) + N_A*plasma_frequency_h(V_R, N_A, N_D))/(N_A + N_D)
+    #omega_p = plasma_frequency_e(V_R, N_A, N_D)
     """
     taking weighted average of e & h plasma frequency
     """
@@ -389,38 +383,48 @@ Source: Silicon optical modulators
         derived for 1.55 um from Electrooptical  Effects  in  Silicon 
                                  RICHARD  A.  SOREF, S
 """
-def n_effective(voltage, N_A, N_D,theory):  #Theory = 1, synopsis = 0, lorentz = 2
-    V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
-    if theory == 1:
-        return -(8.8e-22 * carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6) + 8.5e-18 * pow(carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6),0.8))
-    elif theory == 0:
-        #print(V_R,type(V_R))
-        return -(8.8e-22 * carrier_n(V_R,N_A,N_D) + 8.5e-18 * pow(carrier_p(V_R,N_A,N_D),0.8))
-    elif theory == 2:
-        epsilon = permittivity(float(V_R), N_A, N_D)
-        return (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)+ np.real(epsilon))/2)))
-
+# =============================================================================
+# def n_effective(voltage, N_A, N_D,theory):  #Theory = 1, synopsis = 0, lorentz = 2
+#     V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
+#     if theory == 1:
+#         return -(8.8e-22 * carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6) + 8.5e-18 * pow(carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6),0.8))
+#     elif theory == 0:
+#         #print(V_R,type(V_R))
+#         return -(8.8e-22 * carrier_n(V_R,N_A,N_D) + 8.5e-18 * pow(carrier_p(V_R,N_A,N_D),0.8))
+#     elif theory == 2:
+#         epsilon = permittivity(float(V_R), N_A, N_D)
+#         return (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)+ np.real(epsilon))/2)))
+# 
+# =============================================================================
 """
 Source: Electrooptical  Effects  in  Silicon 
         RICHARD  A.  SOREF, S
 """
+"""
 
-#giving similar result to prev approach
+Wang, Jing
+CMOS-Compatible Silicon Electro-Optic Modulator
+2018-11
+Springer Theses
+"""
 
-# =============================================================================
-# def n_effective(voltage, N_A, N_D,theory):  #Theory = 1, synopsis = 0, lorentz = 2
-#     V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
-#     constant = ((e ** 2) * ((wavelength) ** 2))/ (8 * (np.pi**2) * ((c)**2) * (epsilon_0 ) * n)
-#     if theory == 1:
-#         #converting /cc to /m3
-#         return -constant * (carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6)/(m_star_e*1e-6) + carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6)/(m_star_h*1e-6))
-#     elif theory == 0:
-#         #print(V_R,type(V_R))
-#         return -constant * ((carrier_n((V_R),N_A,N_D)/(m_star_e*1e-6)) + (carrier_p((V_R),N_A,N_D)/(m_star_h*1e-6)))
-#     elif theory == 2:
-#         epsilon = permittivity(float(V_R), N_A, N_D)
-#         return (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)+ np.real(epsilon))/2)))
-# =============================================================================
+def n_effective(voltage, N_A, N_D,theory):  
+    #Theory_Plasma = 1, synopsis_Plasma = 0, lorentz = 2, Theory_kk = 3, synopsis_kk = 4
+    V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
+    constant = ((e ** 2) * ((wavelength) ** 2))/ (8 * (np.pi**2) * ((c)**2) * (epsilon_0 ) * n)
+    if theory == 1:
+        #converting /cc to /m3
+        return -constant * (carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6)/(m_star_e*1e-6) + carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6)/(m_star_h*1e-6))
+    elif theory == 0:
+        #print(V_R,type(V_R))
+        return -constant * ((carrier_n((V_R),N_A,N_D)/(m_star_e*1e-6)) + (carrier_p((V_R),N_A,N_D)/(m_star_h*1e-6)))
+    elif theory == 2:
+        epsilon = permittivity(float(V_R), N_A, N_D)
+        return (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)+ np.real(epsilon))/2)))
+    elif theory == 3:
+        return -(8.8e-22 * carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6) + 8.5e-18 * pow(carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6),0.8))
+    elif theory == 4:
+        return -(8.8e-22 * carrier_n(V_R,N_A,N_D) + 8.5e-18 * pow(carrier_p(V_R,N_A,N_D),0.8))
 """
 Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave Mach-Zehnder Modulator
         David Patel
@@ -437,11 +441,11 @@ Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave M
 #         epsilon = permittivity(float(V_R), N_A, N_D)
 #         return (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)+ np.real(epsilon))/2)))
 # 
+# 
 # =============================================================================
 
-
 def del_phi_eff(V_R, N_A, N_D, LENGTH,theory): #Theory = 1, synopsis = 0, lorentz = 2
-    return ((k_0 *abs( n_effective(V_R, N_A, N_D,theory) - n_effective(0, N_A, N_D, theory))*1e6* LENGTH *0.25 * 1e-3 )) % (2*np.pi) #degree phase
+    return ((k_0 *abs( n_effective(V_R, N_A, N_D,theory) - n_effective(0, N_A, N_D, theory)) *1e-3 )) % (2*np.pi) #degree phase
 
 """
 Source: Silicon optical modulators  
@@ -449,53 +453,70 @@ Source: Silicon optical modulators
         derived for 1.55 um from Electrooptical  Effects  in  Silicon (taking into consideration changing mobilities)
                                  RICHARD  A.  SOREF
 """
-def alpha_eff(voltage,N_A,N_D,theory): #Theory = 1, synopsis = 0, lorentz = 2
-    V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
-    if theory == 1:
-        del_alpha =  (8.5e-18 * carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6) + 4e-18 * carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6)) #/cm
-        alpha_db = 10 * (del_alpha) * np.log(np.e) #db/cm
-        return alpha_db * (LENGTH / 10)
-    elif theory == 0:    
-        del_alpha =  ((8.5e-18 * carrier_n(V_R,N_A,N_D) + 4e-18 * carrier_p(V_R,N_A,N_D)))
-        alpha_db = 10 * (del_alpha) * np.log(np.e) #db/cm
-        return alpha_db * (LENGTH / 10)
-    elif theory == 2:
-        epsilon = permittivity(float(V_R), N_A, N_D)
-        k_eff = (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)- np.real(epsilon))/2)))
-        del_alpha = ( 2*k_0*k_eff )/1e2 #/cm
-        alpha_db = 10*(del_alpha)*np.log10(np.e)
-        return alpha_db * (LENGTH/10)
-"""
-Source: Electrooptical  Effects  in  Silicon 
-        RICHARD  A.  SOREF, S
-"""
-#not scaled properly
-
 # =============================================================================
 # def alpha_eff(voltage,N_A,N_D,theory): #Theory = 1, synopsis = 0, lorentz = 2
 #     V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
-#     constant = ((e ** 3) * ((wavelength*100) ** 2))/ (4 * (np.pi**2) * ((c*100)**3) * epsilon_0*1e-2 * n)
 #     if theory == 1:
-#         del_alpha = constant * (carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6)/((m_star_e**2 ) *u_e) + carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6)/((m_star_h**2) * u_h)) #/cm 
+#         del_alpha =  (8.5e-18 * carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6) + 4e-18 * carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6)) #/cm
 #         alpha_db = 10 * (del_alpha) * np.log(np.e) #db/cm
 #         return alpha_db * (LENGTH / 10)
 #     elif theory == 0:    
-#         del_alpha = constant * (carrier_n((V_R),N_A,N_D)/((m_star_e**2) *u_e) + carrier_p((V_R),N_A,N_D)/((m_star_h**2) * u_h)) #/cm
+#         del_alpha =  ((8.5e-18 * carrier_n(V_R,N_A,N_D) + 4e-18 * carrier_p(V_R,N_A,N_D)))
 #         alpha_db = 10 * (del_alpha) * np.log(np.e) #db/cm
-#         print(del_alpha, alpha_db)
 #         return alpha_db * (LENGTH / 10)
 #     elif theory == 2:
 #         epsilon = permittivity(float(V_R), N_A, N_D)
 #         k_eff = (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)- np.real(epsilon))/2)))
 #         del_alpha = ( 2*k_0*k_eff )/1e2 #/cm
 #         alpha_db = 10*(del_alpha)*np.log10(np.e)
-#         print(del_alpha, alpha_db)
 #         return alpha_db * (LENGTH/10)
 # =============================================================================
+"""
+Source: Electrooptical  Effects  in  Silicon 
+        RICHARD  A.  SOREF, S
+"""
+#not scaled properly
+"""
+
+Wang, Jing
+CMOS-Compatible Silicon Electro-Optic Modulator
+2018-11
+Springer Theses
+"""
+def alpha_eff(voltage,N_A,N_D,theory): #Theory Plasma= 1, synopsis Plasma = 0, lorentz = 2
+    u_e, u_h = calculate_mobilities(N_A, N_D, t)
+    #print(u_e,u_h)
+    V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
+    constant = ((e ** 3) * ((wavelength) ** 2))/ (4 * (np.pi**2) * ((c*100)**3) * epsilon_0 * n)
+    if theory == 1:
+        del_alpha = constant * (carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6)/((m_star_e**2 ) *u_e) + carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6)/((m_star_h**2) * u_h)) #/cm 
+        alpha_db = 10 * (del_alpha) * np.log10(np.e) #db/cm
+        return alpha_db * (LENGTH / 10)
+    elif theory == 0:    
+        del_alpha = constant * (carrier_n((V_R),N_A,N_D)/((m_star_e**2) *u_e) + carrier_p((V_R),N_A,N_D)/((m_star_h**2) * u_h)) #/cm
+        alpha_db = 10 * (del_alpha) * np.log10(np.e) #db/cm
+        #print(del_alpha, alpha_db)
+        return alpha_db * (LENGTH / 10)
+    elif theory == 2:
+        epsilon = permittivity(float(V_R), N_A, N_D)
+        k_eff = (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)- np.real(epsilon))/2)))
+        del_alpha = ( 2*k_0*k_eff )/1e2 #/cm
+        alpha_db = 10*(del_alpha)*np.log10(np.e)
+        #print(del_alpha, alpha_db)
+        return alpha_db * (LENGTH/10)
+    elif theory == 3:
+        del_alpha =  (8.5e-18 * carrier_n_theory(float(V_R),N_A*1e6,N_D*1e6) + 4e-18 * carrier_p_theory(float(V_R),N_A*1e6,N_D*1e6)) #/cm
+        alpha_db = 10 * (del_alpha) * np.log10(np.e) #db/cm
+        return alpha_db * (LENGTH / 10)
+    elif theory == 4:    
+        del_alpha =  ((8.5e-18 * carrier_n(V_R,N_A,N_D) + 4e-18 * carrier_p(V_R,N_A,N_D)))
+        alpha_db = 10 * (del_alpha) * np.log10(np.e) #db/cm
+        return alpha_db * (LENGTH / 10)
 """
 Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave Mach-Zehnder Modulator
         David Patel
 """
+# =============================================================================
 # def alpha_eff(voltage,N_A,N_D,theory): #Theory = 1, synopsis = 0, lorentz = 2
 #     V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
 #     if theory == 1:
@@ -509,29 +530,35 @@ Source: Design, Analysis, and Performance of a Silicon Photonic Traveling Wave M
 #     elif theory == 2:
 #         epsilon = permittivity(float(V_R), N_A, N_D)
 #         k_eff = (np.sqrt(abs((np.sqrt(np.real(epsilon)**2 + np.imag(epsilon)**2)- np.real(epsilon))/2)))
-#         del_alpha = ( 2*k_0*k_eff )/1e2 #/cm
+#         del_alpha = ( 2*k_0*k_eff ) /100#/cm
 #         alpha_db = 10*(del_alpha)*np.log10(np.e)
 #         return alpha_db * (LENGTH/10)
 # =============================================================================
+
 
 def plot_phi_eff(N_A, N_D):
     V_R_range1 =  np.arange(0,-5.1,-0.5) #    V_R_range =  np.arange(0,-10.1,-0.5)
 
     
     delta_phi1 = [(del_phi_eff(V_R, N_A, N_D,LENGTH,0) - del_phi_eff(0, N_A, N_D,LENGTH,0) ) for V_R in V_R_range1]
-    
-    V_R_range =  np.arange(0,-5.1,-0.005) #    V_R_range =  np.arange(0,-10.1,-0.5)
+    delta_phi4 = [(del_phi_eff(V_R, N_A, N_D,LENGTH,4) - del_phi_eff(0, N_A, N_D,LENGTH,4) ) for V_R in V_R_range1]
+
+    V_R_range =  np.arange(0,-5.1,-0.05) #    V_R_range =  np.arange(0,-10.1,-0.5)
 
     delta_phi3 = [(del_phi_eff(V_R, N_A, N_D,LENGTH,2) - del_phi_eff(0, N_A, N_D,LENGTH,2) ) for V_R in V_R_range]
     
     delta_phi2 = [(del_phi_eff(V_R, N_A, N_D,LENGTH,1) - del_phi_eff(0, N_A, N_D,LENGTH,1) ) for V_R in V_R_range]
 
+    delta_phi5 = [(del_phi_eff(V_R, N_A, N_D,LENGTH,3) - del_phi_eff(0, N_A, N_D,LENGTH,3) ) for V_R in V_R_range]
+
     
     plt.figure(figsize=(10, 6))
-    plt.plot(V_R_range1, (delta_phi1), label='Effective del phi synopsis' ,color = 'blue', linestyle = 'dashed')
-    plt.plot(V_R_range, (delta_phi2), label='Effective del phi literature', color = 'red', linestyle = 'dashed')
+    plt.plot(V_R_range1, (delta_phi1), label='Effective del phi synopsis plasma' ,color = 'blue', linestyle = 'dashed')
+    plt.plot(V_R_range, (delta_phi2), label='Effective del phi theory plasma', color = 'red', linestyle = 'dashed')
     plt.plot(V_R_range, (delta_phi3), label='Effective del phi lorentz', color = 'green', linestyle = 'dashed')
-
+    plt.plot(V_R_range, (delta_phi5), label='Effective del phi theory kramer-kronig', color = 'brown', linestyle = 'dashed')
+    plt.plot(V_R_range1, (delta_phi4), label='Effective del phi synopsis kramer-kronig', color = 'black', linestyle = 'dashed')
+    
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.ylabel(r' $\Delta \phi_{eff}$ [deg/mm]', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.title(rf'$\Delta \phi_{{eff}}$ vs. Reverse Bias Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
@@ -548,13 +575,15 @@ def plot_phi_eff(N_A, N_D):
 
 def plot_n_eff(N_A, N_D):
     V_R_range1 =  np.arange(0,-5.1,-0.5)  #  V_R_range =  np.arange(0,-10.1,-0.5)
-    V_R_range =  np.arange(0,-5.1,-0.005) #    V_R_range =  np.arange(0,-10.1,-0.5)
+    V_R_range =  np.arange(0,-5.1,-0.05) #    V_R_range =  np.arange(0,-10.1,-0.5)
     
 
     delta_n_eff_values1 = [((n_effective(V_R, N_A, N_D,0) - n_effective(0, N_A, N_D,0))) for V_R in V_R_range1]
+    delta_n_eff_values4 = [((n_effective(V_R, N_A, N_D,4) - n_effective(0, N_A, N_D,4))) for V_R in V_R_range1]
 
     delta_n_eff_values3 = [((n_effective(V_R, N_A, N_D,2) - n_effective(0, N_A, N_D,2))) for V_R in V_R_range]
     delta_n_eff_values2 = [((n_effective(V_R, N_A, N_D,1) - n_effective(0, N_A, N_D,1))) for V_R in V_R_range]
+    delta_n_eff_values5 = [((n_effective(V_R, N_A, N_D,3) - n_effective(0, N_A, N_D,3))) for V_R in V_R_range]
 
 # =============================================================================
 #     delta_n_eff_values1 = [((n_effective(V_R, N_A, N_D,0) )) for V_R in V_R_range]
@@ -564,10 +593,12 @@ def plot_n_eff(N_A, N_D):
 # =============================================================================
 
     plt.figure(figsize=(10, 6))
-    plt.plot(V_R_range1, delta_n_eff_values1, label='Effective Refractive Index synoposis', color = 'blue')
-    plt.plot(V_R_range, (delta_n_eff_values2), label='Effective Refractive Index literature', color = 'red')
+    plt.plot(V_R_range1, delta_n_eff_values1, label='Effective Refractive Index synoposis plasma', color = 'blue')
+    plt.plot(V_R_range, (delta_n_eff_values2), label='Effective Refractive Index theory plasma', color = 'red')
     plt.plot(V_R_range, (delta_n_eff_values3), label='Effective Refractive Index lorentz', color = 'green')
-
+    plt.plot(V_R_range, (delta_n_eff_values5), label='Effective Refractive Index theory kramer-kronig', color = 'brown')
+    plt.plot(V_R_range1, (delta_n_eff_values4), label='Effective Refractive Index synoposis kramer-kronig', color = 'black')
+    
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.ylabel(r' $\Delta n_{eff}$ ', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.title(rf'$\Delta n_{{eff}}$ vs. Reverse Bias Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
@@ -578,20 +609,26 @@ def plot_n_eff(N_A, N_D):
 
 def plot_alpha_eff(N_A, N_D):
     V_R_range1 =  np.arange(0,-5.1,-0.5)
-    V_R_range =  np.arange(0,-5.1,-0.005)
+    V_R_range =  np.arange(0,-5.1,-0.05)
     
     #delta_alpha1 = [(alpha_eff(V_R, N_A1, N_D1) - alpha_eff(0, N_A1, N_D1)) for V_R in V_R_range]
     #delta_alpha2 = [(alpha_eff(V_R, N_A2, N_D2) - alpha_eff(0, N_A2, N_D2)) for V_R in V_R_range]
     delta_alpha1 = [(alpha_eff(V_R, N_A, N_D,0))for V_R in V_R_range1]
+    delta_alpha4 = [(alpha_eff(V_R, N_A, N_D,4))for V_R in V_R_range1]
+
     delta_alpha2 = [(alpha_eff(V_R, N_A, N_D,1)) for V_R in V_R_range]
     delta_alpha3 = [(alpha_eff(V_R, N_A, N_D,2)) for V_R in V_R_range]
+    delta_alpha5 = [(alpha_eff(V_R, N_A, N_D,3)) for V_R in V_R_range]
+
     
     plt.figure(figsize=(10, 6))
-    plt.plot(V_R_range1, (delta_alpha1), label='Effective Loss index synopsis', color = 'blue', linestyle = 'solid',linewidth = 4)
-    plt.plot(V_R_range, (delta_alpha2), label='Effective loss index literature', color = 'red', linestyle = 'dotted',linewidth = 2)
+    plt.plot(V_R_range1, (delta_alpha1), label='Effective Loss index synopsis plasma', color = 'blue', linestyle = 'dashed',linewidth = 4)
+    plt.plot(V_R_range, (delta_alpha2), label='Effective loss index literature plasma', color = 'red', linestyle = 'dotted',linewidth = 2)
     plt.plot(V_R_range, (delta_alpha3), label='Effective loss index lorentz', color = 'green', linestyle = 'dotted',linewidth = 2)
+    plt.plot(V_R_range, (delta_alpha5), label='Effective loss index literature kramer-kronig', color = 'brown', linestyle = 'dotted',linewidth = 2)
+    plt.plot(V_R_range1, (delta_alpha4), label='Effective loss index synopsis kramer-kronig', color = 'black', linestyle = 'dashed',linewidth = 2)
 
-
+    plt.yscale('linear')
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.ylabel(r' $\Delta \alpha_{eff}$ [dB] ', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.title(rf'$\Delta \alpha_{{eff}}$ vs. Reverse Bias Voltage $N_A = {N_A}$ $N_D = {N_D}$ at Length {LENGTH}m', fontdict={'family': 'Times New Roman', 'size': 14})
@@ -661,30 +698,49 @@ def plot_cap(N_A,N_D):
 
 
 def Vpi_lut(N_A,N_D,theory):
-    V_R = np.arange(0,-5.1,-0.5)
+    if theory != 0:
+        V_R = np.arange(-0.1,-5,-0.01)
+    else:
+        V_R = np.arange(-0.5,-5.1,-0.5)
     lut = []
     for v in V_R:
         row = [v]
         del_n_eff = abs(n_effective(v, N_A, N_D,theory)- n_effective(0, N_A, N_D,theory)) #/cc
-        del_phi = ((k_0 *del_n_eff * LENGTH/4 )) % (2*np.pi)
+        del_phi = ((k_0 *del_n_eff * LENGTH)) % (2*np.pi)
         row.append(del_phi)
         lut.append(row)
         #print(wavelength)
     return lut
 
-def Vpi_calc(N_A,N_D,theory):
-    lut = Vpi_lut(N_A, N_D,theory)
+# =============================================================================
+# def Vpi_calc(N_A,N_D,theory):
+#     lut = Vpi_lut(N_A, N_D,theory)
+#     V_values, del_phi_values = zip(*lut)
+# 
+#     # Use interpolation to find V when del_phi = pi
+#     interp_func = interp1d(del_phi_values, V_values, kind='cubic', fill_value='extrapolate')
+#     Vpi= interp_func(np.pi)
+# 
+#     return Vpi
+# =============================================================================
+def polynomial(x, a, b, c, d):
+    return a * x**3 + b * x**2 + c * x + d
+
+def Vpi_calc(N_A, N_D, theory):
+    lut = Vpi_lut(N_A, N_D, theory)
     V_values, del_phi_values = zip(*lut)
 
-    # Use interpolation to find V when del_phi = pi
-    interp_func = interp1d(del_phi_values, V_values, kind='linear', fill_value='extrapolate')
-    Vpi= interp_func(np.pi)
+    # Fit a polynomial to the data
+    params, _ = curve_fit(polynomial, del_phi_values, V_values)
+
+    # Use the polynomial to estimate Vpi when del_phi = pi
+    Vpi = polynomial(np.pi, *params)
 
     return Vpi
-
+type =['synopsis plasma','theory plasma','lorentz','synopsis kramer-kronig','theory kramer-kronig']
 def Lpi(N_A,N_D,theory):
     if theory != 0:
-        V_R = np.arange(-0.1,-10,-0.001)
+        V_R = np.arange(-0.1,-10,-0.01)
     else:
         V_R = np.arange(-0.5,-5.1,-0.5)
     lut = []
@@ -700,25 +756,57 @@ def Lpi(N_A,N_D,theory):
     plt.plot(v,Lpi, color = 'red', label = 'Lpi')
     plt.xlabel('Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
     plt.ylabel('Lpi (mm)', fontdict={'family': 'Times New Roman', 'size': 12})
-    plt.title(f'Lpi vs. Voltage $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
+    plt.title(f'Lpi vs. Voltage $N_A = {N_A}$ $N_D = {N_D}$ {type[theory]}', fontdict={'family': 'Times New Roman', 'size': 14})
     plt.grid(True)
     plt.legend()
     plt.show()
+
     
+def plot_charge_profile_theory(V_R,N_A,N_D):
+    l= np.linspace(-length/2,length/2, 10000)
+    xp = x_p(V_R, N_A*1e6, N_D*1e6)
+    xn = x_n(V_R, N_A*1e6, N_D*1e6)
+    if abs(xp) >= length/2:
+        p = [p_x_maj(x, V_R, N_A*1e6, N_D*1e6)/1e6 for x in l if x <= 0]
+    else:
+        p = [(p_x_maj(x, V_R, N_A*1e6, N_D*1e6)/1e6 if (abs(x)<=abs(xp)) else N_A) for x in l if x <= 0]
+        
+    if xn >= length/2:
+        n = [n_x_maj(x, V_R, N_A*1e6, N_D*1e6)/1e6 for x in l if x > 0]
+    else:
+        n = [(n_x_maj(x, V_R, N_A*1e6, N_D*1e6)/1e6 if (x<=xn) else N_D) for x in l if x > 0]
+    
+    l_p = [x for x in l if x <= 0]
+    l_n = [x for x in l if x > 0]  
+    
+    plt.figure(figsize = (10,6))
+    plt.plot(l_p,p,color = 'blue', label = 'holes major')
+    plt.plot(l_n,n,color = 'red',label = 'electron major')
+    plt.yscale('log')
+    plt.xlabel(r'Length ($\mu$m)', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.ylabel('Density', fontdict={'family': 'Times New Roman', 'size': 12})
+    plt.title(f'Charge Profile $N_A = {N_A}$ $N_D = {N_D}$', fontdict={'family': 'Times New Roman', 'size': 14})
+    plt.legend()
+    plt.show()
 
-
-h_data_by_voltage1 = {}
+N_A = 5e19
+N_D = 5e19
+h_data_by_voltage1 = {} 
 e_data_by_voltage1 = {}
 h_data_by_voltage1,e_data_by_voltage1 =   read_data(N_A, N_D)
 
 print(f'N_A = {N_A} N_D = {N_D}')
 
-print('theory', Vpi_calc(N_A, N_D,1))
-print('exp', Vpi_calc(N_A, N_D,0))
+print('theory plasma', Vpi_calc(N_A, N_D,1))
+print('exp plasma', Vpi_calc(N_A, N_D,0))
 print('lorentz', Vpi_calc(N_A,N_D,2))
+
+
+plot_charge_profile_theory(5, N_A, N_D)
 
 Lpi(N_A,N_D,1)
 Lpi(N_A,N_D,0)
+
 
 plot_cap(N_A,N_D)
 plot_phi_eff(N_A, N_D)
@@ -726,4 +814,5 @@ plot_n_eff(N_A, N_D)
 plot_alpha_eff(N_A, N_D)
 plot_charge_profile(N_A, N_D)
 #plot_charge_profile(N_A2, N_D2)
-Vpi_calc(N_A, N_D,0)
+#Vpi_calc(N_A, N_D,0)
+
