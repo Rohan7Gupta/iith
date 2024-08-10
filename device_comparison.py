@@ -348,13 +348,6 @@ Source: Silicon optical modulators
         derived for 1.55 um from Electrooptical  Effects  in  Silicon 
                                  RICHARD  A.  SOREF, S
 """
-"""
-
-Wang, Jing
-CMOS-Compatible Silicon Electro-Optic Modulator
-2018-11
-Springer Theses
-"""
 def n_effective(voltage, N_A, N_D,theory):  
     #Theory_Plasma = 1, synopsis_Plasma = 0, lorentz = 2, Theory_kk = 3, synopsis_kk = 4
     V_R = f"{voltage:.1f}".rstrip('0').rstrip('.') if voltage % 1 != 0 else str(int(voltage))
@@ -422,13 +415,6 @@ Source: Silicon optical modulators
         derived for 1.55 um from Electrooptical  Effects  in  Silicon (taking into consideration changing mobilities)
                                  RICHARD  A.  SOREF
 """
-"""
-
-Wang, Jing
-CMOS-Compatible Silicon Electro-Optic Modulator
-2018-11
-Springer Theses
-"""
 def alpha_eff(voltage,N_A,N_D,theory): #Theory Plasma= 1, synopsis Plasma = 0, lorentz = 2
     u_e, u_h = calculate_mobilities(N_A, N_D, t)
     #print(u_e,u_h)
@@ -476,7 +462,7 @@ def plot_phi_eff(N_A1, N_D1,N_A2,N_D2,N_A3,N_D3,theory):
     
     plt.figure(figsize=(10, 6))
     plt.plot(V_R_range, (delta_phi1), label=rf'Effective del phi $N_A = {N_A1}$ $N_D = {N_D1}$' ,color = 'blue', linestyle = 'dashed')
-    plt.plot(V_R_range, (delta_phi2), label=rf'Effective del phi $N_A = {N_A2}$ $N_D = {N_D2}$', color = 'red', linestyle = 'dashed')
+    plt.plot(V_R_range, (delta_phi2), label=rf'Effective del phi $N_A = {N_A2}$ $N_D = {N_D2}$', color = 'red', linestyle = 'dotted', marker = 'o')
     plt.plot(V_R_range, (delta_phi3), label=rf'Effective del phi $N_A = {N_A3}$ $N_D = {N_D3}$', color = 'green', linestyle = 'dashed')
 
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
@@ -514,7 +500,7 @@ def plot_n_eff(N_A1, N_D1,N_A2,N_D2,N_A3,N_D3,theory):
 
     plt.figure(figsize=(10, 6))
     plt.plot(V_R_range, delta_n_eff_values1, label=rf'Effective del neff $N_A = {N_A1}$ $N_D = {N_D1}$', color = 'blue')
-    plt.plot(V_R_range, (delta_n_eff_values2), label=rf'Effective del neff $N_A = {N_A2}$ $N_D = {N_D2}$', color = 'red' , linestyle = 'dotted')
+    plt.plot(V_R_range, (delta_n_eff_values2), label=rf'Effective del neff $N_A = {N_A2}$ $N_D = {N_D2}$', color = 'red' , linestyle = 'dotted', marker = 'o')
     plt.plot(V_R_range, (delta_n_eff_values3), label=rf'Effective del neff $N_A = {N_A3}$ $N_D = {N_D3}$', color = 'green')
 
     plt.xlabel('Reverse Bias Voltage (V)', fontdict={'family': 'Times New Roman', 'size': 12})
@@ -658,31 +644,32 @@ h_data_by_voltage2 = {}
 e_data_by_voltage2 = {}
 h_data_by_voltage2,e_data_by_voltage2 =   read_data(N_A2, N_D2)
 '''
-Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 0)
-plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
-plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
-plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
+#Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 0)
+#plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
+#plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
+#plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
 
 
-Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 1)
 Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 0)
-Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 3)
+#Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 3)
 #Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 4)
 
-plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,1)
 plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
-plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,3)
-plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,4)
+#plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,3)
+#plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,4)
 
-plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,1)
 plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
-plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,3)
-plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,4)
+#plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,3)
+#plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,4)
 
-plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,1)
 plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,0)
-plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,3)
-plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,4)
+#plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,3)
+#plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,4)
+
+Lpi(N_A1, N_D1, N_A2, N_D2, N_A3, N_D3, 1)
+plot_phi_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,1)
+plot_n_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,1)
+plot_alpha_eff(N_A1, N_D1, N_A2, N_D2,N_A3,N_D3,1)
 
 plot_charge_profile(N_A1, N_D1)
 plot_charge_profile(N_A2, N_D2)
